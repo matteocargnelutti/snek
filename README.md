@@ -48,7 +48,7 @@ I really hope you'll like this very first version of **Snek**. Without further a
 
 ### Pre-requisites
 - An UNIX-like OS _(Linux, MacOS, etc ...)_
-- Curl _(Mac users can install it via [brew.sh](https://brew.sh/) _
+- Curl _(Mac users can install it via [brew.sh](https://brew.sh/).)_
 - Python 3.7+ recommended
 - [pipenv](https://pipenv.kennethreitz.org/en/latest/)
 
