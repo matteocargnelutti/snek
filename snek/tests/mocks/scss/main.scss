@@ -1,0 +1,25 @@
+* {
+    box-sizing: border-box;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: 'Helvetica';
+}
+
+body > div {
+    text-align: center;
+
+    h1 {
+        font-size: 3rem;
+    }
+
+    img {
+        max-width: 65vw;
+        display: block;
+        margin: auto;
+    }
+}
