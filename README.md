@@ -30,13 +30,13 @@ Follow me on Twitter: [@macargnelutti](https://twitter.com/macargnelutti).
 - It has to work as a **Python module** so it can be integrated in any program
 
 ### Its main features are :
-- **JSON + Markdown** content files
+- **JSON front-matter + Markdown** content files
 - **JSON shared data files** that can be accessed from any template
 - Works as a **Python module**, can be integrated and extended easily
 - [**Mako**](https://www.makotemplates.org/) templating engine
 - Out-of-the box [**SASS**](https://sass-lang.com/) processing
 - Compatible with [**Netlify**](https://www.netlify.com/) and [**Netlify CMS**](https://www.netlifycms.org/)
-- No strict structure: minimum requirements and interchangeable folders architecture.
+- **Simple structure:** few requirements and interchangeable folders architecture.
 
 I really hope you'll like this very first version of **Snek**. Without further ado: let's get started.
 
