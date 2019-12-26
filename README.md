@@ -1,7 +1,7 @@
 # Snek
 ![snek's github banner](https://raw.githubusercontent.com/matteocargnelutti/snek/master/misc/snek-banner-tmp-1750x.png "snek")
 
-**A dead-simple static-site generator / framework for Python.**
+**A simple and minimalistic static-site generator for Python.**
 
 **Current version:** v0.1.0 - _"Danger noodle"_
 
