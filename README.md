@@ -15,7 +15,7 @@
 - [Content management](#content-management)
 - [Shared data](#shared-data)
 - [Templating](#templating)
-- [Netlify and Netlify CMS](#netlify-and-netlify-cms)
+- [Netlify and Netlify CMS _(optional)_](#netlify-and-netlify-cms)
 - [API reference ?](#api-reference)
 - [Contributing](#contributing)
 
