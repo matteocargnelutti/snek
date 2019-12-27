@@ -46,8 +46,8 @@ I really hope you'll like this very first version of **Snek**. Without further a
 
 ## Getting Started
 
-### Pre-requisites
-- An UNIX-like OS _(Linux, MacOS, etc ...)_
+### Prerequisites
+- A UNIX-like OS _(Linux, MacOS, etc ...)_
 - Curl _(Mac users can install it via [brew.sh](https://brew.sh/).)_
 - Python 3.7+ recommended
 - [pipenv](https://pipenv.kennethreitz.org/en/latest/)
@@ -74,7 +74,8 @@ website = Snek()
 website.build()
 ```
 
-To build the current project, simply run `pipenv run python website.py` _(or `python website.py` if you are within your `pipenv` environment)_: this will generate your website in a `build/` folder. 
+To build the current project, simply run `pipenv run python website.py` _(or simply `python website.py` if you already are within your `pipenv` environment)_: this will generate your website in a folder named  `build/`. 
+
 Inside this folder, you will see an `index.html` file: the **Snek** has done its job and has built the website.
 
 ### Serving locally over HTTP
@@ -303,6 +304,8 @@ You will then be able to edit your website via **Netlify CMS**:
 - [snekconfig.py](https://github.com/matteocargnelutti/snek/blob/master/snek/snekconfig.py)
 - [snek.py](https://github.com/matteocargnelutti/snek/blob/master/snek/snek.py)
 
+Having a look at [the current test suite](https://github.com/matteocargnelutti/snek/tree/master/snek/tests) for the project can provide useful insights.
+
 [☝️ Back to summary](#summary)
 
 ---
@@ -310,5 +313,7 @@ You will then be able to edit your website via **Netlify CMS**:
 ## Contributing
 
 **Snek** is in its infancy: if you find bugs, have ideas on how to improve it, or would like to get involved in any other way please feel free to reach out in the [issues](https://github.com/matteocargnelutti/snek/issues).
+
+[☝️ Back to summary](#summary)
 
 ---
