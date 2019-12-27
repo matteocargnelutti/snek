@@ -207,8 +207,6 @@ website.sitemap_flat # List of content files
 
 ## Shared data
 
-☠️ **Work in progress, documentation to come.**
-
 ### Concept
 The content of the **shared data folder** _(`data/`)_ is parsed and made accessible across the entire website.
 
