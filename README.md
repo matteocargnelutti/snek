@@ -293,7 +293,7 @@ Once you **invited yourself** as an **Identity user**, make sure the invite url 
 
 You will then be able to edit your website via **Netlify CMS**: 
 
-<img alt="Netlify CMS 1" src="https://raw.githubusercontent.com/matteocargnelutti/snek/master/misc/screenshot-netlify-cms-1.png">
+<img alt="Netlify CMS 1" src="https://raw.githubusercontent.com/matteocargnelutti/snek/master/misc/screenshot-netlify-cms-2.png">
 
 [☝️ Back to summary](#summary)
 
