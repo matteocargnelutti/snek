@@ -49,7 +49,7 @@ I really hope you'll like this very first version of **Snek**. Without further a
 ### Prerequisites
 - A UNIX-like OS _(Linux, MacOS, etc ...)_
 - Curl _(Mac users can install it via [brew.sh](https://brew.sh/).)_
-- Python 3.7+ recommended
+- Python 3.7.3 minimum
 - [pipenv](https://pipenv.kennethreitz.org/en/latest/)
 
 ### Installing snek and the project template
