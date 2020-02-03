@@ -78,10 +78,12 @@ To build the current project, simply run `pipenv run python website.py` _(or sim
 
 Inside this folder, you will see an `index.html` file: the **Snek** has done its job and has built the website.
 
-### Serving locally over HTTP
+### Serving locally over HTTP with live-reload
 One of the [snektools](https://github.com/matteocargnelutti/snektools), `snekserve`, does two things:
-- It builds your website by calling `website.py`
-- It serves the content of the `build/` folder over HTTP so you can access it in your browser easily.
+- It builds your website by calling `website.py` every time a file changes within the project
+- It serves the content of the `build/` folder over HTTP. The page refreshes automatically when something changes.
+
+This allows you to edit your website and see the changes in real-time in the browser.
 
 **Inside your project folder, simply run:**
 ```bash
@@ -91,8 +93,6 @@ One of the [snektools](https://github.com/matteocargnelutti/snektools), `snekser
 **Open your browser, and go to `http://localhost:8081` to see your website:**
 
 <img alt="snekinit screenshot" src="https://raw.githubusercontent.com/matteocargnelutti/snek/master/misc/screenshot-snekinit.png">
-
-`snekserve` contains a very primivite loop that will keep rebuilding your website: every change you make will be accessible shortly after.
 
 **You are now ready to go !**
 Let's dive a little bit deeper to see what we can do.
