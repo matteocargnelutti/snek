@@ -15,7 +15,8 @@ import markdown
 import sass
 import frontmatter
 from frontmatter.default_handlers import JSONHandler as frontmatter_json_handler
-from mako.template import Template
+from mako.template import Template 
+from mako.lookup import TemplateLookup
 
 from snek.snekconfig import SnekConfig
 
@@ -397,7 +398,8 @@ class Snek:
                 page.content = markdown.markdown(page.content)
 
                 # Render template
-                renderer = Template(filename=template_filepath)
+                lookup = TemplateLookup(directories=[self.config.templates_path,]) # Used to make the template aware of its suroundings
+                renderer = Template(filename=template_filepath, lookup=lookup)
                 html = renderer.render(data=self.data,
                                        sitemap=self.sitemap,
                                        config=self.config.__dict__,
