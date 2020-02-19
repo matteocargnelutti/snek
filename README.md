@@ -3,7 +3,7 @@
 
 **A simple and minimalistic static-site generator for Python.**
 
-**Current version:** v0.1.0 - _"Danger noodle"_
+**Current version:** v0.1.1 - _"Danger noodle"_
 
 ---
 
