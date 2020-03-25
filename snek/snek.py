@@ -259,12 +259,12 @@ class Snek:
             # Load from front-matter and add to default
             try:
                 metadata_from_file = frontmatter.load(filepath, handler=frontmatter_json_handler()).metadata
-                for key, value in metadata_from_file.items():
-                    metadata[key] = value
             # If the file's content is not valid JSON frontmatter, simply log it
             except json.decoder.JSONDecodeError as err:
                 self.__add_error(f"{filepath} does not contain valid JSON. {err}")
 
+            # Update metadata with metadata from file
+            metadata.update(metadata_from_file)
             #
             # Add item and meta data to sitemap tree
             #
