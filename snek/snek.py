@@ -251,16 +251,16 @@ class Snek:
                 'date': None
             }
 
+            # If the file could not be read or open, go to next file
+            if os.access(filepath, os.R_OK):
+                self.__add_error(f"{filepath} cannot be read.")
+                continue
+
             # Load from front-matter and add to default
             try:
                 metadata_from_file = frontmatter.load(filepath, handler=frontmatter_json_handler()).metadata
                 for key, value in metadata_from_file.items():
                     metadata[key] = value
-
-            # If the file could not be read or open, go to next file
-            except FileNotFoundError:
-                self.__add_error(f"{filepath} cannot be read.")
-                continue
             # If the file's content is not valid JSON frontmatter, simply log it
             except json.decoder.JSONDecodeError as err:
                 self.__add_error(f"{filepath} does not contain valid JSON. {err}")
