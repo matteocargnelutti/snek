@@ -252,7 +252,7 @@ class Snek:
             }
 
             # If the file could not be read or open, go to next file
-            if os.access(filepath, os.R_OK):
+            if not os.access(filepath, os.R_OK):
                 self.__add_error(f"{filepath} cannot be read.")
                 continue
 
@@ -265,7 +265,7 @@ class Snek:
 
             # We don't want `filepath` from metadata to change our dict
             metadata.pop("filepath", None)
-            
+
             # Update metadata with metadata from file
             metadata.update(metadata_from_file)
             #
