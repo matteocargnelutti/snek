@@ -5,16 +5,15 @@ snek.snek.py Module: Main Snek class
 # Imports
 #-------------------------------------------------------------------------------
 import os
-import json
 import glob
 import datetime
+from pathlib import Path
 from shutil import rmtree
 from distutils.dir_util import copy_tree
 
 import markdown
 import sass
 import frontmatter
-from frontmatter.default_handlers import JSONHandler as frontmatter_json_handler
 from mako.template import Template 
 from mako.lookup import TemplateLookup
 
@@ -130,6 +129,235 @@ class Snek:
         self.errors.append((now, message))
         return (now, message)
 
+    def _find_files(self, base_path, extra_suffix=None):
+        """
+        Helper function to find files matching the allowed suffixes in the base_path.
+
+        Parameters
+        -----
+        base_path: str
+        extra_suffix: str
+
+        Notes
+        -----
+        If set and starts with '.', extra_suffix will be appended to the glob pattern.
+        If a file cannot be read, it will be skipped.
+
+        Returns
+        -------
+        list
+        """
+
+        glob_pattern = "**/*"
+
+        if extra_suffix and extra_suffix.startswith('.'):
+            glob_pattern = f"{glob_pattern}{extra_suffix}"
+
+        return [
+            p.resolve()
+            for p in Path(base_path).glob(glob_pattern)
+            if (
+                any([suffix in self.config.handlers for suffix in p.suffixes])
+                and p.is_file()
+                and os.access(p, os.R_OK)
+            )
+        ]
+
+    def __parse_frontmatter_from_filepath(self, filepath, metadata_only=False):
+        """
+        Gets frontmatter data from filepath. If metadata_only is set and True, returns only FM metadata.
+
+        Parameters
+        -----
+        filepath: path-like object
+
+        Notes
+        -----
+        Returns None if the frontmatter module used a handler not allowed in self.config.handlers.
+        
+
+        Returns
+        -------
+        dict
+        """
+
+        fm_data = frontmatter.load(filepath)
+        allowed_handlers = tuple(h['frontmatter_handler'] for h in self.config.handlers.values())
+        if not isinstance(fm_data.handler, allowed_handlers):
+            self.__add_error(f"{filepath} has invalid frontmatter data.")
+            return None
+
+        if metadata_only:
+            return fm_data.metadata
+        else:
+            return fm_data
+
+    def __parse_data_from_filepath(self, filepath):
+        """
+        Gets data from filepath.
+
+        Parameters
+        -----
+        filepath: Path object
+
+        Notes
+        -----
+        Tries to load the handler associated with the file suffix in self.config.handlers.
+
+        Returns
+        -------
+        dict
+        """
+
+        # Dynamic parsing based on suffix
+        file_suffix = filepath.suffix
+
+        # Check we can load the file - this should never happen
+        if file_suffix not in self.config.handlers:
+            self.__add_error(f"Unknown suffix {file_suffix} for {filepath}.")
+            return None
+
+        handler = self.config.handlers[file_suffix]
+
+        try:
+            # Read and parse content
+            with open(filepath, "r") as fp:
+                data_piece = handler['loader'](fp)
+        # If the file's content is not valid
+        except handler['exception'] as err:
+            self.__add_error(f"{filepath} does not contain valid data: {err}")
+            return None
+
+        return data_piece
+
+    def __get_nested_keys_from_filepath(self, filepath, base_path):
+        """
+        Strips base_path from filepath, and returns the path as a list of strings.
+        The list can be used to update a "nested" dictionary.
+
+        Parameters
+        -----
+        filepath: Path object
+        base_path: Path object
+
+        Notes
+        -----
+        Removes the suffixes - expects at most 2 suffixes (allowed suffix + extra suffix).
+        (.json.md, .yml.md)
+
+        Returns
+        -------
+        dict
+        """
+
+        # Turns into a relative path
+        relative_path = filepath.relative_to(Path(base_path).resolve())
+
+        # Get all but the last element
+        keys = str(relative_path).split('/')[:-1]
+        
+        # Gets the last element
+        final_key = relative_path.stem
+        
+        # It could still have a suffix (.json.md): strip it
+        if final_key.endswith(tuple(self.config.handlers.keys())):
+            final_key, _ = os.path.splitext(final_key)
+
+        # Add the last element
+        keys.append(final_key)
+
+        return keys
+        
+    def __update_data_from_filepath(self, filepath):
+        """
+        Updates self.data with data from file.
+
+        Parameters
+        -----
+        filepath: Path object
+
+        Returns
+        -------
+        None
+        """
+
+        base_path = self.config.data_path
+        nested_keys = self.__get_nested_keys_from_filepath(filepath, base_path)
+ 
+        data = self.__parse_data_from_filepath(filepath)
+        self.__update_attr_from_nested_keys(self.data, nested_keys, data)
+
+    def __update_sitemap_from_filepath(self, filepath):
+        """
+        Updates self.sitemap with metadata from file.
+
+        Parameters
+        -----
+        filepath: Path object
+
+        Returns
+        -------
+        None
+        """
+
+        base_path = self.config.content_path
+        nested_keys = self.__get_nested_keys_from_filepath(filepath, base_path)
+
+        data = self.__parse_frontmatter_from_filepath(filepath, metadata_only=True)
+
+        # Defaults for metadata
+        metadata = {
+            'filepath': str(filepath),
+            'title': '',
+            'template': None,
+            'category': None,
+            'tags': [],
+            'date': None
+        }
+        # We don't want a rogue filepath from metadata
+        data.pop("filepath", None)
+        
+        # Updates the default values
+        metadata.update(data)
+
+        self.__update_attr_from_nested_keys(self.sitemap, nested_keys, metadata)
+
+    def __update_attr_from_nested_keys(self, attr, keys, value):
+        """
+        Updates the dictionary `attr`. Creates / updates nested dictionaries based on the `keys`.
+        `value` is the last "child".
+        nested_keys = ('content', 'dir1', 'subfolder', 'my_file')
+        -> attr['content']['dir1']['subfolder']['my_file'] = value
+
+        Parameters
+        -----
+        attr: dict
+        keys: list
+        value: object
+
+        Returns
+        -------
+        None
+        """
+        
+        if not keys:
+            return None
+
+        branch = attr
+
+        # Traverse the dictionary through all but the last nested key
+        for k in keys[:-1]:
+            if not k in branch:
+                branch[k] = {}
+            branch = branch[k]
+
+        # Updates the last leaf
+        if keys[-1] not in branch:
+            branch[keys[-1]] = value
+        # Unless there is already something there
+        else:
+            self.__add_error(f"{os.path.join(*keys)} conflicts with another item.")
+        
     def __load_data(self):
         """
         Loads data to be shared accross templates into self.data.
@@ -142,51 +370,17 @@ class Snek:
         -------
         bool
         """
-        # Collect all json files from the data folder
-        data_filepaths = glob.glob(f"{self.config.data_path}/**/*.json", recursive=True)
+        
+        # Collect all files from the data folder
+        data_filepaths = self._find_files(self.config.data_path)
 
         # Clear self.data
         self.data = {}
 
-        # For each file:
-        # - Load and parse content content
-        # - Create an entry in self.data that matches their position inside the data folder
+        # For each file, load and parse content
         for filepath in data_filepaths:
+            self.__update_data_from_filepath(filepath)
 
-            try:
-                # Read and parse content
-                data_piece = open(filepath).read()
-                data_piece = json.loads(data_piece)
-
-                # Remove the data folder from filepath and split it into components
-                filepath = filepath.replace(f"{self.config.data_path}/", '')
-                filepath_components = filepath.split(os.sep)
-
-                # Iterate through the filepath components to add this data to a place in self.data,
-                # so it matches its position in the data folder.
-                # Ex: if ./data/folder1/folder2/file.json > self.data['folder1']['folder2']['file']
-                branch = self.data # branch iterator through self.data
-                for component in filepath_components:
-
-                    # If we have reached the file, clean its name and add content to self.data
-                    if component == filepath_components[-1]:
-                        key = component.replace('.json', '')
-                        branch[key] = data_piece
-                        break
-
-                    # If we have reached a directory and it does not exist a key for it in self.data, create it.
-                    if component not in branch.keys():
-                        branch[component] = {}
-
-                    # Update branch iterator so we are one level deeper in self.data
-                    branch = branch[component]
-
-            # If the file could not be read or open
-            except FileNotFoundError:
-                self.__add_error(f"{filepath} cannot be read.")
-            # If the file's content is not valid JSON
-            except json.decoder.JSONDecodeError as err:
-                self.__add_error(f"{filepath} does not contain valid JSON. {err}")
 
     def __load_templates(self):
         """
@@ -229,71 +423,14 @@ class Snek:
         self.sitemap = {}
         self.sitemap_flat = []
 
-        # For each content file:
-        # - Read and parse meta data
-        # - Add to the sitemap tree in a way that matches the content folder structure.
-        for filepath in glob.glob(f"{self.config.content_path}/**/*.json.md", recursive=True):
+        filepaths = self._find_files(self.config.content_path, extra_suffix=".md")
 
+        # For each file, parse metadata and add to sitemap
+        for filepath in filepaths:
             # Add entry to sitemap_flat
-            self.sitemap_flat.append(filepath)
-
-            #
-            # Prepare meta data
-            #
-
-            # Defaults
-            metadata = {
-                'filepath': filepath,
-                'title': '',
-                'template': None,
-                'category': None,
-                'tags': [],
-                'date': None
-            }
-
-            # If the file could not be read or open, go to next file
-            if not os.access(filepath, os.R_OK):
-                self.__add_error(f"{filepath} cannot be read.")
-                continue
-
-            # Load from front-matter and add to default
-            try:
-                metadata_from_file = frontmatter.load(filepath, handler=frontmatter_json_handler()).metadata
-            # If the file's content is not valid JSON frontmatter, simply log it
-            except json.decoder.JSONDecodeError as err:
-                self.__add_error(f"{filepath} does not contain valid JSON. {err}")
-
-            # We don't want `filepath` from metadata to change our dict
-            metadata.pop("filepath", None)
-
-            # Update metadata with metadata from file
-            metadata.update(metadata_from_file)
-            #
-            # Add item and meta data to sitemap tree
-            #
-
-            # Remove the content folder from filepath and split it into componetns
-            filepath = filepath.replace(f"{self.config.content_path}/", '')
-            filepath_components = filepath.split(os.sep)
-
-            # Iterate through the filepath components to add this data to a place in self.data,
-            # so it matches its position in the data folder.
-            # Ex: if ./content/folder1/folder2/file.json > self.sitemap['folder1']['folder2']['file']
-            branch = self.sitemap # branch iterator through self.data
-            for component in filepath_components:
-
-                # If we have reached the file, clean its name and add content to self.data
-                if component == filepath_components[-1]:
-                    key = component.replace('.json.md', '')
-                    branch[key] = metadata
-                    break
-
-                # If we have reached a directory and it does not exist a key for it in self.data, create it.
-                if component not in branch.keys():
-                    branch[component] = {}
-
-                # Update branch iterator so we are one level deeper in self.data
-                branch = branch[component]
+            self.sitemap_flat.append(str(filepath))
+            # Update self.sitemap
+            self.__update_sitemap_from_filepath(filepath)
 
         return True
 
@@ -372,61 +509,65 @@ class Snek:
         # For each content file
         for source_filepath in self.sitemap_flat:
 
-            try:
-                # Read and parse content
-                page = frontmatter.load(source_filepath, handler=frontmatter_json_handler())
+            # Read and parse content
+            page = self.__parse_frontmatter_from_filepath(source_filepath)
 
-                # In the content filepath, replace content source folder by build folder, and replace ext .md.json by .html
-                destination_filepath = source_filepath.replace(self.config.content_path, self.config.build_path)
-                destination_filepath = destination_filepath.replace('.json.md', '.html')
-
-                # Determine which template should be used.
-                # If content has a "template" field, check it is valid and use it.
-                template_filepath = self.templates_default
-
-                if 'template' in page.metadata and page.metadata['template']:
-
-                    # Append the template folder to the provided template value
-                    wanted_template = f"{self.config.templates_path}/{page.metadata['template']}"
-
-                    # And check if it exists
-                    if os.path.exists(wanted_template):
-                        template_filepath = wanted_template
-
-                #
-                # Render content using template into HTML file
-                #
-
-                # Parse markdown
-                page.content = markdown.markdown(page.content)
-
-                # Render template
-                lookup = TemplateLookup(directories=[self.config.templates_path,]) # Used to make the template aware of its suroundings
-                renderer = Template(filename=template_filepath, lookup=lookup)
-                html = renderer.render(data=self.data,
-                                       sitemap=self.sitemap,
-                                       config=self.config.__dict__,
-                                       metadata=page.metadata,
-                                       content=page.content)
-
-                # Write HTML file
-                destination_dirname = os.path.dirname(destination_filepath)
-                if not os.path.exists(destination_dirname):
-                    os.makedirs(destination_dirname)
-
-                open(destination_filepath, 'w').write(html)
-
-                # Count as built
-                self.pages_built += 1
-
-            # If the file could not be read or open
-            except FileNotFoundError as err:
+            # Check we parsed successfully
+            if not page.metadata:
                 self.pages_skipped += 1
-                self.__add_error(err)
-            # If the file's content is not valid JSON
-            except json.decoder.JSONDecodeError as err:
-                self.pages_skipped += 1
-                self.__add_error(err)
+                continue
+
+            # In the content filepath, replace content source folder by build folder
+            destination_filepath = source_filepath.replace(self.config.content_path, self.config.build_path)
+            
+            # Then strip the final .md
+            destination_filepath = destination_filepath.replace('.md', '')
+            
+            # Strip the extension if it is valid
+            if destination_filepath.endswith(tuple(self.config.handlers.keys())):
+                destination_filepath, _ = os.path.splitext(destination_filepath)
+
+            destination_filepath = f"{destination_filepath}.html"
+
+            # Determine which template should be used.
+            # If content has a "template" field, check it is valid and use it.
+            template_filepath = self.templates_default
+
+            if 'template' in page.metadata and page.metadata['template']:
+
+                # Append the template folder to the provided template value
+                wanted_template = f"{self.config.templates_path}/{page.metadata['template']}"
+
+                # And check if it exists
+                if os.path.exists(wanted_template):
+                    template_filepath = wanted_template
+
+            #
+            # Render content using template into HTML file
+            #
+
+            # Parse markdown
+            page.content = markdown.markdown(page.content)
+
+            # Render template
+            lookup = TemplateLookup(directories=[self.config.templates_path,]) # Used to make the template aware of its suroundings
+            renderer = Template(filename=template_filepath, lookup=lookup)
+            html = renderer.render(data=self.data,
+                                    sitemap=self.sitemap,
+                                    config=self.config.__dict__,
+                                    metadata=page.metadata,
+                                    content=page.content)
+
+            # Write HTML file
+            destination_dirname = os.path.dirname(destination_filepath)
+            if not os.path.exists(destination_dirname):
+                os.makedirs(destination_dirname)
+
+            open(destination_filepath, 'w').write(html)
+
+            # Count as built
+            self.pages_built += 1
+
 
     def __build_scss(self):
         """

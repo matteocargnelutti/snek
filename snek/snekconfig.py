@@ -6,6 +6,11 @@ snek.snekconfig.py Module: Snek configuration object class
 #-------------------------------------------------------------------------------
 import os
 import re
+import json
+import yaml
+
+from frontmatter.default_handlers import JSONHandler
+from frontmatter.default_handlers import YAMLHandler
 
 #-------------------------------------------------------------------------------
 # SnekConfig class
@@ -87,7 +92,7 @@ class SnekConfig:
         -------
         SnekConfig
         """
-        # For now, the configuration is considered valid
+        # For now, the configuration is considered invalid
         self.is_valid = False
 
         #
@@ -131,6 +136,19 @@ class SnekConfig:
         self.scss_active = True if scss_active == True else False
         self.scss_output_style = scss_output_style if scss_output_style in ['compressed', 'nested', 'expanded'] else 'compressed'
         self.data_in_build = True if data_in_build == True else False
+        self.handlers = {
+            '.json': {
+                'loader': json.load,
+                'frontmatter_handler': JSONHandler,
+                'exception': json.decoder.JSONDecodeError,
+            },
+            '.yaml': {
+                'loader': yaml.safe_load,
+                'frontmatter_handler': YAMLHandler,
+                'exception': yaml.YAMLError,
+            }
+        }
+        self.handlers['.yml'] = self.handlers['.yaml']
 
         #
         # If we reach this point, the configuration is valid
