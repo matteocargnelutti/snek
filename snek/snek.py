@@ -254,7 +254,7 @@ class Snek:
         relative_path = filepath.relative_to(Path(base_path).resolve())
 
         # Get all but the last element
-        keys = str(relative_path).split('/')[:-1]
+        keys = str(relative_path).split(os.sep)[:-1]
         
         # Gets the last element
         final_key = relative_path.stem
@@ -384,30 +384,27 @@ class Snek:
 
     def __load_templates(self):
         """
-        List all templates files in self.templates
+        Loads all template files.
 
         Returns
         -------
         bool
         """
         # Load all template files
-        self.templates = glob.glob(f"{self.config.templates_path}/**/*.html", recursive=True)
+        templates = Path(self.config.templates_path).glob("**/*.html")
+        
+        # Make sure these are files and can be read
+        self.templates = filter(lambda t: t.is_file() and os.access(t, os.R_OK), templates)
 
         # Check if the default is available
-        has_default_template = False
-
-        for template in self.templates: # Look for a "index.html" at the root of the templates folder
-            template_check = template.replace(self.config.templates_path, '')
-            template_check = template_check.replace('/', '')
-            template_check = template_check.replace('\\', '')
-
-            if template_check == 'index.html':
-                has_default_template = True
-                self.templates_default = template # Remember the default template
-
-        if not has_default_template:
+        for template in self.templates:
+            if template.name == "index.html":
+                self.templates_default = str(template)
+                break
+        else:
             raise NoDefaultTemplate
-
+        
+        
         # If we land here, there is at least the default template.
         return True
 
@@ -536,7 +533,7 @@ class Snek:
             if 'template' in page.metadata and page.metadata['template']:
 
                 # Append the template folder to the provided template value
-                wanted_template = f"{self.config.templates_path}/{page.metadata['template']}"
+                wanted_template = os.path.join(self.config.templates_path, page.metadata['template'])
 
                 # And check if it exists
                 if os.path.exists(wanted_template):
@@ -563,7 +560,8 @@ class Snek:
             if not os.path.exists(destination_dirname):
                 os.makedirs(destination_dirname)
 
-            open(destination_filepath, 'w').write(html)
+            with open(destination_filepath, 'w') as fp:
+                fp.write(html)
 
             # Count as built
             self.pages_built += 1
@@ -579,7 +577,7 @@ class Snek:
         bool
         """
         input_folder = self.config.scss_path
-        output_folder = self.config.build_path+'/css'
+        output_folder = os.path.join(self.config.build_path, 'css')
         scss_output_style = self.config.scss_output_style
 
         sass.compile(dirname=(input_folder, output_folder), output_style=scss_output_style)
@@ -595,7 +593,7 @@ class Snek:
         -------
         bool
         """
-        copy_tree(self.config.css_path, self.config.build_path + '/css')
+        copy_tree(self.config.css_path, os.path.join(self.config.build_path, 'css'))
         return True
 
     def __build_js(self):
@@ -606,7 +604,7 @@ class Snek:
         -------
         bool
         """
-        copy_tree(self.config.js_path, self.config.build_path + '/js')
+        copy_tree(self.config.js_path, os.path.join(self.config.build_path, 'js'))
         return True
 
     def __build_data(self):
@@ -618,7 +616,7 @@ class Snek:
         -------
         bool
         """
-        copy_tree(self.config.data_path, self.config.build_path + '/__data')
+        copy_tree(self.config.data_path, os.path.join(self.config.build_path, '__data'))
         return True
 
     def __build_assets(self):
@@ -629,7 +627,7 @@ class Snek:
         -------
         bool
         """
-        copy_tree(self.config.assets_path, self.config.build_path + '/assets')
+        copy_tree(self.config.assets_path, os.path.join(self.config.build_path, 'assets'))
         return True
 
 #-------------------------------------------------------------------------------
