@@ -10,7 +10,7 @@ from shutil import rmtree
 import pytest
 
 from snek.snek import Snek
-from snek.snekconfig import SnekConfig
+from snek.config import SnekConfig
 from snek.tests import MOCKS_FOLDER
 
 #-------------------------------------------------------------------------------
@@ -82,6 +82,8 @@ def test_build_with_scss():
     assert website.data
     assert website.data['test1']
     assert website.data['test1']['test-key']
+    assert website.data['test2']
+    assert website.data['test2']['test-key']
     assert website.data['subfolder']
     assert website.data['subfolder']['test2']
     assert website.data['subfolder']['test2']['test-key']
@@ -90,6 +92,9 @@ def test_build_with_scss():
     assert website.data['subfolder']['subsubfolder']['test3']['test-key']
     assert website.data['subfolder']['subsubfolder']['test4']
     assert website.data['subfolder']['subsubfolder']['test4']['test-key']
+    assert website.data['subfolder']['subsubfolder']['test5']
+    assert website.data['subfolder']['subsubfolder']['test5']['test-key']
+    
 
     # Test alterations
     website.data['test2'] = {'test-key': 'Lorem Ipsum'}
@@ -114,10 +119,12 @@ def test_build_with_scss():
     assert website.sitemap['subfolder']['subsubfolder']['test3']['title']
     assert website.sitemap['subfolder']['subsubfolder']['test4']
     assert website.sitemap['subfolder']['subsubfolder']['test4']['title']
+    assert website.sitemap['subfolder']['subsubfolder']['test5']
+    assert website.sitemap['subfolder']['subsubfolder']['test5']['title']
 
     # Flat sitemap
     assert website.sitemap_flat
-    assert len(website.sitemap_flat) == 4
+    assert len(website.sitemap_flat) == 5
 
     #
     # Build

@@ -8,4 +8,4 @@ snek.__init__.py: Snek package entry point
 # Imports
 #-------------------------------------------------------------------------------
 from snek.snek import Snek
-from snek.snekconfig import SnekConfig
+from snek.config import SnekConfig
