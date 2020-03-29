@@ -8,7 +8,7 @@ import uuid
 
 import pytest
 
-from snek.snekconfig import SnekConfig
+from snek.config import SnekConfig
 from snek.tests import MOCKS_FOLDER
 
 #-------------------------------------------------------------------------------

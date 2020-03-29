@@ -148,6 +148,8 @@ class SnekConfig:
                 'exception': yaml.YAMLError,
             }
         }
+
+        # We process .yml files like .yaml files
         self.handlers['.yml'] = self.handlers['.yaml']
 
         #

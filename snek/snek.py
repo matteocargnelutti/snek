@@ -17,7 +17,9 @@ import frontmatter
 from mako.template import Template 
 from mako.lookup import TemplateLookup
 
-from snek.snekconfig import SnekConfig
+from snek.config import SnekConfig
+from snek.utils import SnekUtils as utils
+from snek.utils import SnekDict, DuplicateKeyError
 
 #-------------------------------------------------------------------------------
 # Main Snek class
@@ -77,8 +79,8 @@ class Snek:
         self.build_end = None
         self.pages_built = 0
         self.pages_skipped = 0
-        self.data = {}
-        self.sitemap = {}
+        self.data = SnekDict()
+        self.sitemap = SnekDict()
         self.sitemap_flat = []
         self.templates = []
         self.templates_default = None
@@ -101,19 +103,19 @@ class Snek:
         #
         # Load shared data
         #
-        self.__load_data()
+        self._load_data()
 
         #
         # Load content map
         #
-        self.__load_sitemap()
+        self._load_sitemap()
 
         #
         # Load templates list
         #
-        self.__load_templates()
+        self._load_templates()
 
-    def __add_error(self, message):
+    def _add_error(self, message):
         """
         Add an error to the error stack.
 
@@ -129,41 +131,8 @@ class Snek:
         self.errors.append((now, message))
         return (now, message)
 
-    def _find_files(self, base_path, extra_suffix=None):
-        """
-        Helper function to find files matching the allowed suffixes in the base_path.
 
-        Parameters
-        -----
-        base_path: str
-        extra_suffix: str
-
-        Notes
-        -----
-        If set and starts with '.', extra_suffix will be appended to the glob pattern.
-        If a file cannot be read, it will be skipped.
-
-        Returns
-        -------
-        list
-        """
-
-        glob_pattern = "**/*"
-
-        if extra_suffix and extra_suffix.startswith('.'):
-            glob_pattern = f"{glob_pattern}{extra_suffix}"
-
-        return [
-            p.resolve()
-            for p in Path(base_path).glob(glob_pattern)
-            if (
-                any([suffix in self.config.handlers for suffix in p.suffixes])
-                and p.is_file()
-                and os.access(p, os.R_OK)
-            )
-        ]
-
-    def __parse_frontmatter_from_filepath(self, filepath, metadata_only=False):
+    def _parse_frontmatter_from_filepath(self, filepath, metadata_only=False):
         """
         Gets frontmatter data from filepath. If metadata_only is set and True, returns only FM metadata.
 
@@ -184,7 +153,7 @@ class Snek:
         fm_data = frontmatter.load(filepath)
         allowed_handlers = tuple(h['frontmatter_handler'] for h in self.config.handlers.values())
         if not isinstance(fm_data.handler, allowed_handlers):
-            self.__add_error(f"{filepath} has invalid frontmatter data.")
+            self._add_error(f"{filepath} has invalid frontmatter data.")
             return None
 
         if metadata_only:
@@ -192,83 +161,8 @@ class Snek:
         else:
             return fm_data
 
-    def __parse_data_from_filepath(self, filepath):
-        """
-        Gets data from filepath.
-
-        Parameters
-        -----
-        filepath: Path object
-
-        Notes
-        -----
-        Tries to load the handler associated with the file suffix in self.config.handlers.
-
-        Returns
-        -------
-        dict
-        """
-
-        # Dynamic parsing based on suffix
-        file_suffix = filepath.suffix
-
-        # Check we can load the file - this should never happen
-        if file_suffix not in self.config.handlers:
-            self.__add_error(f"Unknown suffix {file_suffix} for {filepath}.")
-            return None
-
-        handler = self.config.handlers[file_suffix]
-
-        try:
-            # Read and parse content
-            with open(filepath, "r") as fp:
-                data_piece = handler['loader'](fp)
-        # If the file's content is not valid
-        except handler['exception'] as err:
-            self.__add_error(f"{filepath} does not contain valid data: {err}")
-            return None
-
-        return data_piece
-
-    def __get_nested_keys_from_filepath(self, filepath, base_path):
-        """
-        Strips base_path from filepath, and returns the path as a list of strings.
-        The list can be used to update a "nested" dictionary.
-
-        Parameters
-        -----
-        filepath: Path object
-        base_path: Path object
-
-        Notes
-        -----
-        Removes the suffixes - expects at most 2 suffixes (allowed suffix + extra suffix).
-        (.json.md, .yml.md)
-
-        Returns
-        -------
-        dict
-        """
-
-        # Turns into a relative path
-        relative_path = filepath.relative_to(Path(base_path).resolve())
-
-        # Get all but the last element
-        keys = str(relative_path).split(os.sep)[:-1]
         
-        # Gets the last element
-        final_key = relative_path.stem
-        
-        # It could still have a suffix (.json.md): strip it
-        if final_key.endswith(tuple(self.config.handlers.keys())):
-            final_key, _ = os.path.splitext(final_key)
-
-        # Add the last element
-        keys.append(final_key)
-
-        return keys
-        
-    def __update_data_from_filepath(self, filepath):
+    def _update_data_from_filepath(self, filepath):
         """
         Updates self.data with data from file.
 
@@ -282,12 +176,33 @@ class Snek:
         """
 
         base_path = self.config.data_path
-        nested_keys = self.__get_nested_keys_from_filepath(filepath, base_path)
+        nested_keys = utils.get_nested_keys_from_filepath(filepath, where=base_path, strip_suffixes=self.config.handlers.keys())
  
-        data = self.__parse_data_from_filepath(filepath)
-        self.__update_attr_from_nested_keys(self.data, nested_keys, data)
+        # Dynamic parsing based on suffix
+        file_suffix = filepath.suffix
 
-    def __update_sitemap_from_filepath(self, filepath):
+        # Check we can load the file - this should never happen
+        if file_suffix not in self.config.handlers.keys():
+            self._add_error(f"Unknown suffix {file_suffix} for {filepath}.")
+            return None
+
+        handler = self.config.handlers[file_suffix]
+
+        try:
+            # Read and parse content
+            with open(filepath, "r") as fp:
+                data = handler['loader'](fp)
+        # If the file's content is not valid
+        except handler['exception'] as err:
+            self._add_error(f"{filepath} does not contain valid data: {err}")
+            return None
+
+        try:
+            self.data.update_from_nested_keys(keys=nested_keys, value=data)
+        except DuplicateKeyError as e:
+            self._add_error(str(e))
+
+    def _update_sitemap_from_filepath(self, filepath):
         """
         Updates self.sitemap with metadata from file.
 
@@ -301,9 +216,9 @@ class Snek:
         """
 
         base_path = self.config.content_path
-        nested_keys = self.__get_nested_keys_from_filepath(filepath, base_path)
+        nested_keys = utils.get_nested_keys_from_filepath(filepath, where=base_path, strip_suffixes=self.config.handlers.keys())
 
-        data = self.__parse_frontmatter_from_filepath(filepath, metadata_only=True)
+        data = self._parse_frontmatter_from_filepath(filepath, metadata_only=True)
 
         # Defaults for metadata
         metadata = {
@@ -320,45 +235,13 @@ class Snek:
         # Updates the default values
         metadata.update(data)
 
-        self.__update_attr_from_nested_keys(self.sitemap, nested_keys, metadata)
+        try:
+            self.sitemap.update_from_nested_keys(keys=nested_keys, value=metadata)
+        except DuplicateKeyError as e:
+            self._add_error(str(e))
 
-    def __update_attr_from_nested_keys(self, attr, keys, value):
-        """
-        Updates the dictionary `attr`. Creates / updates nested dictionaries based on the `keys`.
-        `value` is the last "child".
-        nested_keys = ('content', 'dir1', 'subfolder', 'my_file')
-        -> attr['content']['dir1']['subfolder']['my_file'] = value
-
-        Parameters
-        -----
-        attr: dict
-        keys: list
-        value: object
-
-        Returns
-        -------
-        None
-        """
         
-        if not keys:
-            return None
-
-        branch = attr
-
-        # Traverse the dictionary through all but the last nested key
-        for k in keys[:-1]:
-            if not k in branch:
-                branch[k] = {}
-            branch = branch[k]
-
-        # Updates the last leaf
-        if keys[-1] not in branch:
-            branch[keys[-1]] = value
-        # Unless there is already something there
-        else:
-            self.__add_error(f"{os.path.join(*keys)} conflicts with another item.")
-        
-    def __load_data(self):
+    def _load_data(self):
         """
         Loads data to be shared accross templates into self.data.
 
@@ -372,17 +255,17 @@ class Snek:
         """
         
         # Collect all files from the data folder
-        data_filepaths = self._find_files(self.config.data_path)
+        data_filepaths = utils.find_files(where=self.config.data_path, suffixes=self.config.handlers.keys())
 
         # Clear self.data
-        self.data = {}
+        self.data = SnekDict()
 
         # For each file, load and parse content
         for filepath in data_filepaths:
-            self.__update_data_from_filepath(filepath)
+            self._update_data_from_filepath(filepath)
 
 
-    def __load_templates(self):
+    def _load_templates(self):
         """
         Loads all template files.
 
@@ -408,7 +291,7 @@ class Snek:
         # If we land here, there is at least the default template.
         return True
 
-    def __load_sitemap(self):
+    def _load_sitemap(self):
         """
         List all content files and load their metadata in self.sitemap and self.sitemap_flat
 
@@ -417,17 +300,22 @@ class Snek:
         bool
         """
         # Clear sitemap
-        self.sitemap = {}
+        self.sitemap = SnekDict()
         self.sitemap_flat = []
 
-        filepaths = self._find_files(self.config.content_path, extra_suffix=".md")
+        # Find files - add .md to the allowed suffixes
+        filepaths = utils.find_files(
+            where=self.config.content_path,
+            suffixes=self.config.handlers.keys(),
+            extra_suffix=".md"
+        )
 
         # For each file, parse metadata and add to sitemap
         for filepath in filepaths:
             # Add entry to sitemap_flat
             self.sitemap_flat.append(str(filepath))
             # Update self.sitemap
-            self.__update_sitemap_from_filepath(filepath)
+            self._update_sitemap_from_filepath(filepath)
 
         return True
 
@@ -448,22 +336,22 @@ class Snek:
         self.build_start = datetime.datetime.now()
 
         # Build assets files and JavaScript
-        self.__build_assets()
-        self.__build_js()
+        self._build_assets()
+        self._build_js()
 
         # Build scss if option active
         if self.config.scss_active:
-            self.__build_scss()
+            self._build_scss()
         # Build css if scss option inactive
         else:
-            self.__build_css()
+            self._build_css()
 
         # Process content files
-        self.__build_content()
+        self._build_content()
 
         # Copy data files if asked to in config
         if self.config.data_in_build:
-            self.__build_data()
+            self._build_data()
 
         # Timer end
         self.build_end = datetime.datetime.now()
@@ -487,7 +375,7 @@ class Snek:
             'errors': self.errors
         }
 
-    def __build_content(self):
+    def _build_content(self):
         """
         Processes content files: generates HTML by running them through their associated template.
 
@@ -507,7 +395,7 @@ class Snek:
         for source_filepath in self.sitemap_flat:
 
             # Read and parse content
-            page = self.__parse_frontmatter_from_filepath(source_filepath)
+            page = self._parse_frontmatter_from_filepath(source_filepath)
 
             # Check we parsed successfully
             if not page.metadata:
@@ -567,7 +455,7 @@ class Snek:
             self.pages_built += 1
 
 
-    def __build_scss(self):
+    def _build_scss(self):
         """
         Builds content of SCSS files to the /css folder of the build folder.
         Will be ignored if config.scss_active is False.
@@ -584,7 +472,7 @@ class Snek:
 
         return True
 
-    def __build_css(self):
+    def _build_css(self):
         """
         Copies contents of the CSS folder to /css in the build folder.
         Will be ignored by build() if config.scss_active is True.
@@ -596,7 +484,7 @@ class Snek:
         copy_tree(self.config.css_path, os.path.join(self.config.build_path, 'css'))
         return True
 
-    def __build_js(self):
+    def _build_js(self):
         """
         Copies contents of the JavaScript folder to /js in the build folder
 
@@ -607,7 +495,7 @@ class Snek:
         copy_tree(self.config.js_path, os.path.join(self.config.build_path, 'js'))
         return True
 
-    def __build_data(self):
+    def _build_data(self):
         """
         Copies contents of the data folder to /__data in the build folder.
         Will be ignored by build() if config.data_in_build is False.
@@ -619,7 +507,7 @@ class Snek:
         copy_tree(self.config.data_path, os.path.join(self.config.build_path, '__data'))
         return True
 
-    def __build_assets(self):
+    def _build_assets(self):
         """
         Copies contents of the assets folder to /assets in the build folder
 
